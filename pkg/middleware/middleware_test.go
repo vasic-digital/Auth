@@ -338,3 +338,105 @@ func TestAPIKeyFromContext_Empty(t *testing.T) {
 	key := APIKeyFromContext(ctx)
 	assert.Empty(t, key)
 }
+
+func TestRequireScopes_InvalidScopesType(t *testing.T) {
+	// Test when scopes in context is not []string (line 145-152)
+	handler := RequireScopes("read")(okHandler())
+
+	req := httptest.NewRequest("GET", "/", nil)
+	// Set scopes as wrong type (string instead of []string)
+	ctx := context.WithValue(req.Context(), ScopesKey, "not-a-slice")
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "invalid scopes in context")
+}
+
+func TestRequireScopes_InvalidScopesType_Int(t *testing.T) {
+	// Test when scopes in context is an int
+	handler := RequireScopes("admin")(okHandler())
+
+	req := httptest.NewRequest("GET", "/", nil)
+	ctx := context.WithValue(req.Context(), ScopesKey, 12345)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "invalid scopes in context")
+}
+
+func TestRequireScopes_InvalidScopesType_Map(t *testing.T) {
+	// Test when scopes in context is a map
+	handler := RequireScopes("write")(okHandler())
+
+	req := httptest.NewRequest("GET", "/", nil)
+	ctx := context.WithValue(req.Context(), ScopesKey, map[string]bool{"read": true})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Contains(t, rec.Body.String(), "invalid scopes in context")
+}
+
+func TestBearerToken_ScopesExtraction_NonSliceType(t *testing.T) {
+	// Test when claims["scopes"] exists but is not []string
+	// This exercises lines 86-90 where scopes extraction may fail
+	validator := &testTokenValidator{
+		claims: map[string]interface{}{
+			"sub":    "user-1",
+			"scopes": "read,write", // String instead of []string
+		},
+	}
+
+	var capturedScopes []string
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedScopes = ScopesFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := BearerToken(validator)(inner)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	// Scopes should be nil because it wasn't a []string
+	assert.Nil(t, capturedScopes)
+}
+
+func TestBearerToken_ScopesExtraction_ValidSlice(t *testing.T) {
+	// Test when claims["scopes"] is a valid []string
+	validator := &testTokenValidator{
+		claims: map[string]interface{}{
+			"sub":    "user-1",
+			"scopes": []string{"read", "write", "admin"},
+		},
+	}
+
+	var capturedScopes []string
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedScopes = ScopesFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+
+	handler := BearerToken(validator)(inner)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, []string{"read", "write", "admin"}, capturedScopes)
+}

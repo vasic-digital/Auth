@@ -49,14 +49,35 @@ type Token struct {
 	Raw string
 }
 
+// Parser defines the interface for parsing JWT tokens.
+// This allows dependency injection for testing.
+type Parser interface {
+	Parse(tokenString string, keyFunc gojwt.Keyfunc) (*gojwt.Token, error)
+}
+
+// defaultParser wraps gojwt.Parse as the default implementation.
+type defaultParser struct{}
+
+func (p *defaultParser) Parse(
+	tokenString string, keyFunc gojwt.Keyfunc,
+) (*gojwt.Token, error) {
+	return gojwt.Parse(tokenString, keyFunc)
+}
+
 // Manager handles JWT token operations using the provided Config.
 type Manager struct {
 	config *Config
+	parser Parser
 }
 
 // NewManager creates a new JWT Manager with the given configuration.
 func NewManager(config *Config) *Manager {
-	return &Manager{config: config}
+	return &Manager{config: config, parser: &defaultParser{}}
+}
+
+// SetParser sets a custom parser for testing purposes.
+func (m *Manager) SetParser(p Parser) {
+	m.parser = p
 }
 
 // Create generates a signed JWT string from the provided claims.
@@ -97,7 +118,7 @@ func (m *Manager) Create(claims map[string]interface{}) (string, error) {
 // decoded Token with claims on success, or an error if the token
 // is invalid, expired, or cannot be verified.
 func (m *Manager) Validate(tokenString string) (*Token, error) {
-	parsed, err := gojwt.Parse(tokenString, func(t *gojwt.Token) (interface{}, error) {
+	parsed, err := m.parser.Parse(tokenString, func(t *gojwt.Token) (interface{}, error) {
 		if t.Method.Alg() != m.config.SigningMethod.Alg() {
 			return nil, fmt.Errorf(
 				"unexpected signing method: %v", t.Header["alg"],

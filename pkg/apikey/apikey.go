@@ -95,6 +95,9 @@ func NewGenerator(config *GeneratorConfig) *Generator {
 	return &Generator{config: config}
 }
 
+// randReader is the random reader used by Generate. Exposed for testing.
+var randReader = rand.Reader
+
 // Generate creates a new API key with the given name, scopes, and
 // optional expiration. Returns the full APIKey struct including the
 // generated key string.
@@ -102,7 +105,7 @@ func (g *Generator) Generate(
 	name string, scopes []string, expiresAt time.Time,
 ) (*APIKey, error) {
 	randomBytes := make([]byte, g.config.Length)
-	if _, err := rand.Read(randomBytes); err != nil {
+	if _, err := randReader.Read(randomBytes); err != nil {
 		return nil, fmt.Errorf("failed to generate random bytes: %w", err)
 	}
 
@@ -251,8 +254,16 @@ func MaskKey(key string) string {
 		prefixEnd = 3
 	}
 
+	// Handle edge case where prefix is too close to end
+	maskLen := len(key) - prefixEnd - 4
+	if maskLen < 0 {
+		// Not enough room for prefix + mask + suffix
+		// Just mask everything after short prefix
+		return key[:min(3, len(key))] + strings.Repeat("*", max(0, len(key)-3))
+	}
+
 	masked := key[:prefixEnd] +
-		strings.Repeat("*", len(key)-prefixEnd-4) +
+		strings.Repeat("*", maskLen) +
 		key[len(key)-4:]
 	return masked
 }

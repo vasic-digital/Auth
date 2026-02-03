@@ -567,3 +567,274 @@ func TestDefaultConfig_Values(t *testing.T) {
 	assert.Equal(t, 30*time.Second, cfg.RateLimitInterval)
 }
 
+func TestFileCredentialReader_ReadCredentials_ReadError(t *testing.T) {
+	// Test non-existent read errors (permission denied)
+	// Create a directory with no read permission to simulate read error
+	tmpDir := t.TempDir()
+	restrictedDir := filepath.Join(tmpDir, "restricted")
+	require.NoError(t, os.Mkdir(restrictedDir, 0000))
+	defer func() { _ = os.Chmod(restrictedDir, 0755) }()
+
+	restrictedPath := filepath.Join(restrictedDir, "creds.json")
+
+	reader := NewFileCredentialReader(map[string]string{
+		"provider": restrictedPath,
+	})
+
+	_, err := reader.ReadCredentials("provider")
+	assert.Error(t, err)
+	// On Linux, attempting to read a file in a dir with no permissions
+	// results in "permission denied" or similar error
+	assert.Contains(t, err.Error(), "failed to read")
+}
+
+func TestHTTPTokenRefresher_Refresh_InvalidEndpoint(t *testing.T) {
+	// Test with an invalid URL that causes http.NewRequest to fail
+	refresher := NewHTTPTokenRefresher(nil, "", nil)
+
+	// Using control characters in URL makes NewRequest fail
+	_, err := refresher.Refresh("refresh-token", "http://[::1]:namedport")
+	assert.Error(t, err)
+	// Note: Different Go versions may produce different error messages
+}
+
+func TestHTTPTokenRefresher_Refresh_NetworkError(t *testing.T) {
+	// Test with unreachable endpoint to trigger client.Do error
+	client := &http.Client{Timeout: 100 * time.Millisecond}
+	refresher := NewHTTPTokenRefresher(client, "", nil)
+
+	// Use a non-routable address that will timeout/fail
+	_, err := refresher.Refresh(
+		"refresh-token",
+		"http://192.0.2.1:12345/token", // TEST-NET-1, non-routable
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh request failed")
+}
+
+func TestHTTPTokenRefresher_Refresh_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("{invalid json"))
+		}),
+	)
+	defer server.Close()
+
+	refresher := NewHTTPTokenRefresher(nil, "", nil)
+	_, err := refresher.Refresh("refresh-token", server.URL)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse refresh response")
+}
+
+type errorReader struct{}
+
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("read error")
+}
+
+func (e *errorReader) Close() error {
+	return nil
+}
+
+func TestHTTPTokenRefresher_Refresh_BodyReadError(t *testing.T) {
+	// Create a custom transport that returns a response with an error reader
+	transport := &errorTransport{}
+
+	client := &http.Client{Transport: transport}
+	refresher := NewHTTPTokenRefresher(client, "", nil)
+
+	_, err := refresher.Refresh("refresh-token", "http://example.com/token")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read refresh response")
+}
+
+// errorTransport is a custom RoundTripper that returns a response
+// with an error-producing body reader.
+type errorTransport struct{}
+
+func (t *errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       &errorReader{},
+		Header:     make(http.Header),
+	}, nil
+}
+
+func TestAutoRefresher_GetCredentials_ReaderError(t *testing.T) {
+	reader := &mockReader{
+		err: fmt.Errorf("read error"),
+	}
+
+	ar := NewAutoRefresher(reader, nil, nil, nil)
+
+	_, err := ar.GetCredentials("provider")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read credentials")
+}
+
+func TestAutoRefresher_tryRefresh_NoEndpoint(t *testing.T) {
+	expiringSoon := &Credentials{
+		AccessToken:  "old-token",
+		RefreshToken: "refresh-token",
+		ExpiresAt:    time.Now().Add(-time.Hour), // Already expired
+	}
+
+	reader := &mockReader{
+		creds: map[string]*Credentials{"provider": expiringSoon},
+	}
+
+	cfg := DefaultConfig()
+	cfg.RefreshThreshold = 10 * time.Minute
+
+	// No endpoints configured
+	ar := NewAutoRefresher(reader, nil, cfg, nil)
+
+	_, err := ar.GetCredentials("provider")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no token endpoint")
+}
+
+func TestAutoRefresher_tryRefresh_NoRefreshToken(t *testing.T) {
+	expiringSoon := &Credentials{
+		AccessToken: "old-token",
+		// No RefreshToken
+		ExpiresAt: time.Now().Add(-time.Hour), // Already expired
+	}
+
+	reader := &mockReader{
+		creds: map[string]*Credentials{"provider": expiringSoon},
+	}
+
+	cfg := DefaultConfig()
+	cfg.RefreshThreshold = 10 * time.Minute
+
+	ar := NewAutoRefresher(
+		reader, nil, cfg,
+		map[string]string{"provider": "http://example.com/token"},
+	)
+
+	_, err := ar.GetCredentials("provider")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no refresh token")
+}
+
+func TestAutoRefresher_tryRefresh_CarriesOverScopesAndMetadata(t *testing.T) {
+	originalCreds := &Credentials{
+		AccessToken:  "old-token",
+		RefreshToken: "refresh-token",
+		ExpiresAt:    time.Now().Add(2 * time.Minute),
+		Scopes:       []string{"read", "write"},
+		Metadata: map[string]interface{}{
+			"custom_key": "custom_value",
+		},
+	}
+
+	reader := &mockReader{
+		creds: map[string]*Credentials{"provider": originalCreds},
+	}
+
+	// Refreshed creds without scopes/metadata
+	refreshedCreds := &Credentials{
+		AccessToken:  "new-token",
+		RefreshToken: "new-refresh",
+		ExpiresAt:    time.Now().Add(time.Hour),
+		// No Scopes or Metadata returned
+	}
+
+	refresher := &mockRefresher{creds: refreshedCreds}
+
+	cfg := DefaultConfig()
+	cfg.RefreshThreshold = 10 * time.Minute
+
+	ar := NewAutoRefresher(
+		reader, refresher, cfg,
+		map[string]string{"provider": "http://example.com/token"},
+	)
+
+	got, err := ar.GetCredentials("provider")
+	require.NoError(t, err)
+	assert.Equal(t, "new-token", got.AccessToken)
+	// Scopes and metadata should be carried over
+	assert.Equal(t, []string{"read", "write"}, got.Scopes)
+	assert.Equal(t, "custom_value", got.Metadata["custom_key"])
+}
+
+func TestAutoRefresher_tryRefresh_RefresherError(t *testing.T) {
+	expiringSoon := &Credentials{
+		AccessToken:  "old-token",
+		RefreshToken: "refresh-token",
+		ExpiresAt:    time.Now().Add(-time.Hour), // Already expired
+	}
+
+	reader := &mockReader{
+		creds: map[string]*Credentials{"provider": expiringSoon},
+	}
+
+	refresher := &mockRefresher{
+		err: fmt.Errorf("refresh failed"),
+	}
+
+	cfg := DefaultConfig()
+	cfg.RefreshThreshold = 10 * time.Minute
+
+	ar := NewAutoRefresher(
+		reader, refresher, cfg,
+		map[string]string{"provider": "http://example.com/token"},
+	)
+
+	_, err := ar.GetCredentials("provider")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh failed")
+}
+
+func TestHTTPTokenRefresher_Refresh_NoExpiresIn(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			resp := RefreshResponse{
+				AccessToken: "new-token",
+				// No ExpiresIn
+			}
+			respData, _ := json.Marshal(resp)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(respData)
+		}),
+	)
+	defer server.Close()
+
+	refresher := NewHTTPTokenRefresher(nil, "", nil)
+	creds, err := refresher.Refresh("refresh-token", server.URL)
+	require.NoError(t, err)
+	assert.Equal(t, "new-token", creds.AccessToken)
+	// ExpiresAt should be zero since no ExpiresIn was returned
+	assert.True(t, creds.ExpiresAt.IsZero())
+}
+
+func TestHTTPTokenRefresher_Refresh_NoClientID(t *testing.T) {
+	var receivedClientID string
+
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			err := r.ParseForm()
+			require.NoError(t, err)
+			receivedClientID = r.FormValue("client_id")
+
+			resp := RefreshResponse{
+				AccessToken: "new-token",
+				ExpiresIn:   3600,
+			}
+			respData, _ := json.Marshal(resp)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(respData)
+		}),
+	)
+	defer server.Close()
+
+	// Create refresher with empty clientID
+	refresher := NewHTTPTokenRefresher(nil, "", nil)
+	_, err := refresher.Refresh("refresh-token", server.URL)
+	require.NoError(t, err)
+	// client_id should not be sent
+	assert.Empty(t, receivedClientID)
+}
+

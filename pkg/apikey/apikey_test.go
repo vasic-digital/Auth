@@ -1,6 +1,9 @@
 package apikey
 
 import (
+	"crypto/rand"
+	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -8,6 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// errorReader is a reader that always returns an error.
+type errorReaderForRand struct {
+	err error
+}
+
+func (e *errorReaderForRand) Read(_ []byte) (int, error) {
+	return 0, e.err
+}
 
 func TestAPIKey_IsExpired(t *testing.T) {
 	tests := []struct {
@@ -358,3 +370,70 @@ func TestMaskKey(t *testing.T) {
 		})
 	}
 }
+
+func TestMaskKey_NoDash(t *testing.T) {
+	// Test key without dash prefix (prefixEnd will be 0, then set to 3)
+	key := "1234567890abcdef"
+	masked := MaskKey(key)
+
+	// Should show first 3 chars, mask middle, show last 4
+	assert.Equal(t, "123*********cdef", masked)
+}
+
+func TestMaskKey_ExactlyEightChars(t *testing.T) {
+	// Test key with exactly 8 characters (edge case)
+	key := "12345678"
+	masked := MaskKey(key)
+
+	// Should return all asterisks
+	assert.Equal(t, "********", masked)
+}
+
+func TestMaskKey_NineChars(t *testing.T) {
+	// Test key with 9 characters (just over 8)
+	key := "123456789"
+	masked := MaskKey(key)
+
+	// prefixEnd will be 0 (no dash), then set to 3
+	// First 3: "123", last 4: "6789", middle: 2 chars
+	assert.Equal(t, "123**6789", masked)
+}
+
+func TestMaskKey_DashAtEnd(t *testing.T) {
+	// Test key with dash at end
+	key := "abcdefghij-"
+	masked := MaskKey(key)
+
+	// prefixEnd should be 11 (position after the dash)
+	// This will cause the mask to be negative, which is handled
+	assert.NotEmpty(t, masked)
+}
+
+func TestGenerator_Generate_RandReadError(t *testing.T) {
+	// Save the original randReader
+	origReader := randReader
+	defer func() { randReader = origReader }()
+
+	// Replace with error reader
+	randReader = &errorReaderForRand{err: errors.New("random source unavailable")}
+
+	gen := NewGenerator(nil)
+	key, err := gen.Generate("test", []string{"read"}, time.Time{})
+
+	require.Error(t, err)
+	assert.Nil(t, key)
+	assert.Contains(t, err.Error(), "failed to generate random bytes")
+	assert.Contains(t, err.Error(), "random source unavailable")
+}
+
+func TestGenerator_Generate_RestoreRandReader(t *testing.T) {
+	// Verify that randReader is still the default after previous test
+	// This ensures the defer worked correctly
+	gen := NewGenerator(nil)
+	key, err := gen.Generate("restore-test", []string{"read"}, time.Time{})
+	require.NoError(t, err)
+	assert.NotNil(t, key)
+}
+
+// Ensure we use the standard crypto/rand.Reader by default
+var _ io.Reader = rand.Reader
