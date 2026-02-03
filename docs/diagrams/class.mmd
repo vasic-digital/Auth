@@ -1,0 +1,190 @@
+classDiagram
+    class Token {
+        <<interface>>
+        +AccessToken() string
+        +RefreshToken() string
+        +ExpiresAt() time.Time
+        +IsExpired() bool
+        +NeedsRefresh(threshold time.Duration) bool
+    }
+
+    class SimpleToken {
+        -accessToken string
+        -refreshToken string
+        -expiresAt time.Time
+        +AccessToken() string
+        +RefreshToken() string
+        +ExpiresAt() time.Time
+        +IsExpired() bool
+        +NeedsRefresh(threshold time.Duration) bool
+    }
+
+    class Store {
+        <<interface>>
+        +Get(key string) (Token, error)
+        +Set(key string, token Token, ttl time.Duration) error
+        +Delete(key string) error
+        +Revoke(key string) error
+    }
+
+    class InMemoryTokenStore {
+        -mu sync.RWMutex
+        -entries map~string, storeEntry~
+        +Get(key string) (Token, error)
+        +Set(key string, token Token, ttl time.Duration) error
+        +Delete(key string) error
+        +Revoke(key string) error
+        +Cleanup() int
+        +Len() int
+    }
+
+    class Claims {
+        <<map~string, interface~~>>
+        +Subject() string
+        +Issuer() string
+        +Audience() string
+        +ExpiresAt() time.Time
+        +IssuedAt() time.Time
+        +Get(key string) interface~~
+        +GetString(key string) string
+    }
+
+    class JWTConfig {
+        +SigningMethod gojwt.SigningMethod
+        +Secret []byte
+        +Expiration time.Duration
+        +Issuer string
+    }
+
+    class JWTToken {
+        +Claims map~string, interface~~
+        +ExpiresAt time.Time
+        +IssuedAt time.Time
+        +Raw string
+    }
+
+    class JWTManager {
+        -config *Config
+        +Create(claims map~string, interface~~) (string, error)
+        +Validate(tokenString string) (*Token, error)
+        +Refresh(tokenString string) (string, error)
+    }
+
+    class APIKey {
+        +ID string
+        +Key string
+        +Name string
+        +Scopes []string
+        +ExpiresAt time.Time
+        +CreatedAt time.Time
+        +IsExpired() bool
+        +HasScope(scope string) bool
+        +HasAllScopes(scopes []string) bool
+    }
+
+    class GeneratorConfig {
+        +Prefix string
+        +Length int
+    }
+
+    class Generator {
+        -config *GeneratorConfig
+        +Generate(name string, scopes []string, expiresAt time.Time) (*APIKey, error)
+    }
+
+    class KeyStore {
+        <<interface>>
+        +Store(key *APIKey) error
+        +Get(keyString string) (*APIKey, error)
+        +GetByID(id string) (*APIKey, error)
+        +Delete(keyString string) error
+        +List() ([]*APIKey, error)
+    }
+
+    class InMemoryKeyStore {
+        -mu sync.RWMutex
+        -byKey map~string, APIKey~
+        -byID map~string, APIKey~
+        +Store(key *APIKey) error
+        +Get(keyString string) (*APIKey, error)
+        +GetByID(id string) (*APIKey, error)
+        +Delete(keyString string) error
+        +List() ([]*APIKey, error)
+    }
+
+    class Credentials {
+        +AccessToken string
+        +RefreshToken string
+        +ExpiresAt time.Time
+        +Scopes []string
+        +Metadata map~string, interface~~
+        +IsExpired() bool
+        +NeedsRefresh(threshold time.Duration) bool
+    }
+
+    class CredentialReader {
+        <<interface>>
+        +ReadCredentials(providerName string) (*Credentials, error)
+    }
+
+    class FileCredentialReader {
+        -paths map~string, string~
+        +ReadCredentials(providerName string) (*Credentials, error)
+    }
+
+    class TokenRefresher {
+        <<interface>>
+        +Refresh(refreshToken string, endpoint string) (*Credentials, error)
+    }
+
+    class HTTPTokenRefresher {
+        -client *http.Client
+        -clientID string
+        -params map~string, string~
+        +Refresh(refreshToken string, endpoint string) (*Credentials, error)
+    }
+
+    class OAuthConfig {
+        +RefreshThreshold time.Duration
+        +CacheDuration time.Duration
+        +RateLimitInterval time.Duration
+    }
+
+    class AutoRefresher {
+        -mu sync.Mutex
+        -reader CredentialReader
+        -refresher TokenRefresher
+        -config *Config
+        -endpoints map~string, string~
+        -cache map~string, cachedCredentials~
+        -lastRefr map~string, time.Time~
+        +GetCredentials(providerName string) (*Credentials, error)
+        +ClearCache()
+        +ClearCacheFor(providerName string)
+    }
+
+    class TokenValidator {
+        <<interface>>
+        +ValidateToken(token string) (map~string, interface~~, error)
+    }
+
+    class APIKeyValidator {
+        <<interface>>
+        +ValidateKey(key string) ([]string, error)
+    }
+
+    Token <|.. SimpleToken : implements
+    Store <|.. InMemoryTokenStore : implements
+    KeyStore <|.. InMemoryKeyStore : implements
+    CredentialReader <|.. FileCredentialReader : implements
+    TokenRefresher <|.. HTTPTokenRefresher : implements
+
+    JWTManager --> JWTConfig : configured by
+    JWTManager --> JWTToken : produces
+    Generator --> GeneratorConfig : configured by
+    Generator --> APIKey : produces
+    AutoRefresher --> CredentialReader : reads from
+    AutoRefresher --> TokenRefresher : refreshes via
+    AutoRefresher --> OAuthConfig : configured by
+    AutoRefresher --> Credentials : manages
+    InMemoryTokenStore --> Token : stores

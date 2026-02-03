@@ -1,0 +1,88 @@
+graph TD
+    subgraph "digital.vasic.auth"
+        subgraph "pkg/token"
+            Token["Token (interface)"]
+            Store["Store (interface)"]
+            Claims["Claims (map type)"]
+            SimpleToken["SimpleToken"]
+            InMemoryTokenStore["InMemoryStore"]
+        end
+
+        subgraph "pkg/jwt"
+            JWTConfig["Config"]
+            JWTToken["Token (struct)"]
+            JWTManager["Manager"]
+        end
+
+        subgraph "pkg/apikey"
+            APIKey["APIKey (struct)"]
+            GeneratorConfig["GeneratorConfig"]
+            Generator["Generator"]
+            KeyStore["KeyStore (interface)"]
+            InMemoryKeyStore["InMemoryStore"]
+            Validate["Validate()"]
+            MaskKey["MaskKey()"]
+        end
+
+        subgraph "pkg/oauth"
+            Credentials["Credentials"]
+            CredentialReader["CredentialReader (interface)"]
+            TokenRefresher["TokenRefresher (interface)"]
+            FileCredentialReader["FileCredentialReader"]
+            HTTPTokenRefresher["HTTPTokenRefresher"]
+            OAuthConfig["Config"]
+            AutoRefresher["AutoRefresher"]
+        end
+
+        subgraph "pkg/middleware"
+            Middleware["Middleware (type)"]
+            TokenValidator["TokenValidator (interface)"]
+            APIKeyValidator["APIKeyValidator (interface)"]
+            BearerToken["BearerToken()"]
+            APIKeyHeader["APIKeyHeader()"]
+            RequireScopes["RequireScopes()"]
+            Chain["Chain()"]
+            ContextAccessors["ClaimsFromContext()\nScopesFromContext()\nAPIKeyFromContext()"]
+        end
+    end
+
+    subgraph "Consumer Application"
+        App["HTTP Server"]
+        JWTAdapter["JWT TokenValidator\nadapter"]
+        KeyAdapter["APIKey Validator\nadapter"]
+    end
+
+    subgraph "External Dependencies"
+        GolangJWT["github.com/golang-jwt/jwt/v5"]
+        GoogleUUID["github.com/google/uuid"]
+    end
+
+    SimpleToken -.->|implements| Token
+    InMemoryTokenStore -.->|implements| Store
+    InMemoryKeyStore -.->|implements| KeyStore
+    FileCredentialReader -.->|implements| CredentialReader
+    HTTPTokenRefresher -.->|implements| TokenRefresher
+
+    AutoRefresher -->|uses| CredentialReader
+    AutoRefresher -->|uses| TokenRefresher
+    AutoRefresher -->|configured by| OAuthConfig
+
+    JWTManager -->|configured by| JWTConfig
+    Generator -->|configured by| GeneratorConfig
+    Validate -->|uses| KeyStore
+
+    BearerToken -->|uses| TokenValidator
+    APIKeyHeader -->|uses| APIKeyValidator
+    Chain -->|composes| Middleware
+
+    JWTManager -->|depends on| GolangJWT
+    Generator -->|depends on| GoogleUUID
+
+    App -->|uses| BearerToken
+    App -->|uses| APIKeyHeader
+    App -->|uses| Chain
+    App -->|reads context| ContextAccessors
+    JWTAdapter -->|wraps| JWTManager
+    JWTAdapter -.->|implements| TokenValidator
+    KeyAdapter -->|wraps| Validate
+    KeyAdapter -.->|implements| APIKeyValidator

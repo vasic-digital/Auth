@@ -1,0 +1,82 @@
+sequenceDiagram
+    participant Client
+    participant Middleware as BearerToken Middleware
+    participant Validator as TokenValidator (adapter)
+    participant JWTManager as jwt.Manager
+    participant GolangJWT as golang-jwt/jwt/v5
+    participant Handler as HTTP Handler
+
+    Note over Client,Handler: JWT Authentication Flow
+
+    Client->>Middleware: HTTP Request<br/>Authorization: Bearer <token>
+
+    Middleware->>Middleware: Extract Authorization header
+    alt Missing header
+        Middleware-->>Client: 401 {"error":"missing authorization header"}
+    end
+
+    Middleware->>Middleware: Validate "Bearer " prefix
+    alt Invalid scheme
+        Middleware-->>Client: 401 {"error":"invalid authorization scheme, expected Bearer"}
+    end
+
+    Middleware->>Middleware: Extract token string
+    alt Empty token
+        Middleware-->>Client: 401 {"error":"empty bearer token"}
+    end
+
+    Middleware->>Validator: ValidateToken(tokenStr)
+    Validator->>JWTManager: Validate(tokenStr)
+
+    JWTManager->>GolangJWT: Parse(tokenStr, keyFunc)
+    GolangJWT->>GolangJWT: Decode header and payload
+    GolangJWT->>GolangJWT: Verify signature with secret
+
+    alt Signing method mismatch
+        GolangJWT-->>JWTManager: error: unexpected signing method
+        JWTManager-->>Validator: error: failed to parse token
+        Validator-->>Middleware: error
+        Middleware-->>Client: 401 {"error":"invalid token"}
+    end
+
+    alt Token expired or invalid
+        GolangJWT-->>JWTManager: error: token expired/invalid
+        JWTManager-->>Validator: error: failed to parse token
+        Validator-->>Middleware: error
+        Middleware-->>Client: 401 {"error":"invalid token"}
+    end
+
+    GolangJWT-->>JWTManager: parsed token with MapClaims
+
+    JWTManager->>JWTManager: Extract claims map
+    JWTManager->>JWTManager: Parse exp -> ExpiresAt
+    JWTManager->>JWTManager: Parse iat -> IssuedAt
+    JWTManager-->>Validator: *jwt.Token{Claims, ExpiresAt, IssuedAt, Raw}
+
+    Validator->>Validator: Extract Claims map
+    Validator-->>Middleware: claims map[string]interface{}
+
+    Middleware->>Middleware: Store claims in context (ClaimsKey)
+    Middleware->>Middleware: Extract scopes from claims if present
+    Middleware->>Middleware: Store scopes in context (ScopesKey)
+
+    Middleware->>Handler: next.ServeHTTP(w, r.WithContext(ctx))
+
+    Handler->>Handler: ClaimsFromContext(ctx) -> claims
+    Handler->>Handler: ScopesFromContext(ctx) -> scopes
+    Handler->>Handler: Process request
+
+    Handler-->>Client: HTTP Response
+
+    Note over Client,Handler: Token Refresh Flow
+
+    Client->>JWTManager: Refresh(oldTokenStr)
+    JWTManager->>JWTManager: Validate(oldTokenStr)
+    alt Invalid token
+        JWTManager-->>Client: error: cannot refresh invalid token
+    end
+    JWTManager->>JWTManager: Strip exp, iat, iss from claims
+    JWTManager->>JWTManager: Create(userClaims)
+    JWTManager->>GolangJWT: NewWithClaims + SignedString
+    GolangJWT-->>JWTManager: new signed token string
+    JWTManager-->>Client: newTokenStr
