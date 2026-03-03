@@ -158,9 +158,9 @@ func Validate(store KeyStore, keyString string) (*APIKey, error) {
 
 // InMemoryStore is a thread-safe in-memory implementation of KeyStore.
 type InMemoryStore struct {
-	mu     sync.RWMutex
-	byKey  map[string]*APIKey
-	byID   map[string]*APIKey
+	mu    sync.RWMutex
+	byKey map[string]*APIKey
+	byID  map[string]*APIKey
 }
 
 // NewInMemoryStore creates a new InMemoryStore.

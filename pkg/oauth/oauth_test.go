@@ -2,11 +2,11 @@ package oauth
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"fmt"
 	"testing"
 	"time"
 
@@ -837,4 +837,3 @@ func TestHTTPTokenRefresher_Refresh_NoClientID(t *testing.T) {
 	// client_id should not be sent
 	assert.Empty(t, receivedClientID)
 }
-
