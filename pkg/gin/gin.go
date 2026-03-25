@@ -23,7 +23,7 @@ type Config struct {
 	QueryParam string
 }
 
-// DefaultConfig returns a Config matching Bear Messenger's conventions.
+// DefaultConfig returns a Config with sensible default conventions.
 func DefaultConfig() *Config {
 	return &Config{
 		HeaderName: "X-Access-Token",
