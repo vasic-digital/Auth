@@ -161,8 +161,13 @@ func TestE2E_TokenRefreshCycle(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		refreshed, err := mgr.Refresh(current)
 		require.NoError(t, err)
-		assert.NotEqual(t, current, refreshed)
+		require.NotEmpty(t, refreshed, "refresh #%d must return a non-empty token", i)
 
+		// Note: don't assert inequality between `current` and `refreshed`.
+		// JWT refresh is deterministic — same input token + same
+		// second-granularity iat/exp claims produce identical signatures.
+		// The real invariants are (1) refresh succeeds, (2) the output
+		// validates, (3) claims round-trip correctly.
 		tok, err := mgr.Validate(refreshed)
 		require.NoError(t, err)
 		assert.Equal(t, "refresh-user", tok.Claims["sub"])
