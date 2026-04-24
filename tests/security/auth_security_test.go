@@ -19,7 +19,7 @@ import (
 
 func TestSecurity_JWTTamperDetection(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("security-test-secret-key"))
@@ -42,7 +42,7 @@ func TestSecurity_JWTTamperDetection(t *testing.T) {
 
 func TestSecurity_JWTWrongSecret(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr1 := jwt.NewManager(jwt.DefaultConfig("secret-one"))
@@ -57,7 +57,7 @@ func TestSecurity_JWTWrongSecret(t *testing.T) {
 
 func TestSecurity_EmptyAndMalformedTokens(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("test-secret"))
@@ -79,7 +79,7 @@ func TestSecurity_EmptyAndMalformedTokens(t *testing.T) {
 
 func TestSecurity_BearerTokenInjection(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	validator := &alwaysRejectValidator{}
@@ -116,7 +116,7 @@ func (v *alwaysRejectValidator) ValidateToken(_ string) (map[string]interface{},
 
 func TestSecurity_APIKeyStoreDeduplication(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := apikey.NewInMemoryStore()
@@ -150,7 +150,7 @@ func TestSecurity_APIKeyStoreDeduplication(t *testing.T) {
 
 func TestSecurity_ExpiredAPIKeyRejection(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := apikey.NewInMemoryStore()
@@ -171,7 +171,7 @@ func TestSecurity_ExpiredAPIKeyRejection(t *testing.T) {
 
 func TestSecurity_OAuthEmptyAccessToken(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	creds := &oauth.Credentials{
@@ -188,7 +188,7 @@ func TestSecurity_OAuthEmptyAccessToken(t *testing.T) {
 
 func TestSecurity_TokenStoreRevokedAccess(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -210,7 +210,7 @@ func TestSecurity_TokenStoreRevokedAccess(t *testing.T) {
 
 func TestSecurity_NilClaimsCreation(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping security test in short mode")
+		t.Skip("skipping security test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("nil-claims-test"))
