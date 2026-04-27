@@ -17,7 +17,7 @@ import (
 
 func TestStress_ConcurrentJWTCreateValidate(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("stress-test-jwt-secret"))
@@ -60,7 +60,7 @@ func TestStress_ConcurrentJWTCreateValidate(t *testing.T) {
 
 func TestStress_ConcurrentAPIKeyStoreOperations(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := apikey.NewInMemoryStore()
@@ -105,7 +105,7 @@ func TestStress_ConcurrentAPIKeyStoreOperations(t *testing.T) {
 
 func TestStress_ConcurrentTokenStoreReadWrite(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -140,7 +140,7 @@ func TestStress_ConcurrentTokenStoreReadWrite(t *testing.T) {
 
 func TestStress_ConcurrentJWTRefresh(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("refresh-stress-secret"))
@@ -150,33 +150,46 @@ func TestStress_ConcurrentJWTRefresh(t *testing.T) {
 	const goroutines = 50
 	var wg sync.WaitGroup
 	results := make([]string, goroutines)
+	errors := make([]error, goroutines)
 
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
 		go func(idx int) {
 			defer wg.Done()
 			refreshed, err := mgr.Refresh(tokenStr)
-			if err == nil {
-				results[idx] = refreshed
-			}
+			results[idx] = refreshed
+			errors[idx] = err
 		}(i)
 	}
 
 	wg.Wait()
 
-	uniqueTokens := make(map[string]bool)
-	for _, r := range results {
-		if r != "" {
-			uniqueTokens[r] = true
-		}
+	// Under concurrency, every refresh MUST succeed (there is no
+	// shared mutable state that could cause a refresh to fail) — this
+	// is the real property the stress test should assert.
+	//
+	// The previous assertion ("concurrent refreshes produce unique
+	// tokens") was inherently flaky because JWT refresh is
+	// deterministic: same input token + same second-granularity
+	// iat/exp claims → identical signatures → identical tokens. The
+	// prior test passed by luck when clock ticks happened to straddle
+	// the second boundary during the goroutine burst.
+	for i, err := range errors {
+		require.NoError(t, err, "refresh #%d must succeed under concurrency", i)
+		require.NotEmpty(t, results[i], "refresh #%d must return a non-empty token", i)
 	}
-	assert.True(t, len(uniqueTokens) > 1,
-		"concurrent refreshes should produce unique tokens")
+
+	// Every returned token must parse back as a valid JWT — concurrent
+	// refresh must never corrupt the token structure.
+	for i, r := range results {
+		_, err := mgr.Validate(r)
+		require.NoError(t, err, "refreshed token #%d must be valid JWT", i)
+	}
 }
 
 func TestStress_ConcurrentTokenStoreCleanup(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -210,7 +223,7 @@ func TestStress_ConcurrentTokenStoreCleanup(t *testing.T) {
 
 func TestStress_APIKeyGenerationUniqueness(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	gen := apikey.NewGenerator(&apikey.GeneratorConfig{

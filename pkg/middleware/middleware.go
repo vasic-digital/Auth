@@ -82,9 +82,12 @@ func BearerToken(validator TokenValidator) Middleware {
 
 			ctx := context.WithValue(r.Context(), ClaimsKey, claims)
 
-			// Extract scopes if present
+			// Extract scopes if present. After a JWT round-trip, a claim
+			// originally set as []string comes back as []interface{} (JSON
+			// doesn't preserve typed arrays), so we must handle both.
 			if scopes, ok := claims["scopes"]; ok {
-				if scopeList, ok := scopes.([]string); ok {
+				scopeList := coerceScopes(scopes)
+				if len(scopeList) > 0 {
 					ctx = context.WithValue(ctx, ScopesKey, scopeList)
 				}
 			}
@@ -195,6 +198,28 @@ func ClaimsFromContext(ctx context.Context) map[string]interface{} {
 func ScopesFromContext(ctx context.Context) []string {
 	scopes, _ := ctx.Value(ScopesKey).([]string)
 	return scopes
+}
+
+// coerceScopes normalizes a scopes claim into []string. JWT round-trips
+// turn []string into []interface{} because JSON has no typed arrays, so
+// the token validator must accept both. All other types yield nil —
+// callers that want RFC 6749 space-separated string-scope support
+// should pre-parse before putting the claim in.
+func coerceScopes(v interface{}) []string {
+	switch s := v.(type) {
+	case []string:
+		return s
+	case []interface{}:
+		out := make([]string, 0, len(s))
+		for _, item := range s {
+			if str, ok := item.(string); ok {
+				out = append(out, str)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 // APIKeyFromContext extracts the API key from the request context.

@@ -1,0 +1,8 @@
+Commit: 4bff77b28ab829d4795aee6be86c0b50467c8ff5
+Branch: main
+4bff77b fix(middleware,tests): JWT round-trip scope coercion + flaky token equality
+3d1c01f fix(tests/stress): make TestStress_ConcurrentJWTRefresh deterministic
+053d40d Merge gitlab/main into main (absorb security fix)
+4bd4f21 MANDATORY: Add ZERO UNFINISHED WORK POLICY to AGENTS.md
+4297f89 Add GitHub Sponsors button for vasic-digital
+
