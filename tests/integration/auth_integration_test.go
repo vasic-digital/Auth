@@ -22,7 +22,7 @@ import (
 
 func TestJWTCreateValidateRefreshFlow(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	cfg := &jwt.Config{
@@ -71,7 +71,7 @@ func TestJWTCreateValidateRefreshFlow(t *testing.T) {
 
 func TestAPIKeyGenerateStoreValidateFlow(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	gen := apikey.NewGenerator(&apikey.GeneratorConfig{
@@ -113,7 +113,7 @@ func TestAPIKeyGenerateStoreValidateFlow(t *testing.T) {
 
 func TestMiddlewareBearerTokenIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	jwtMgr := jwt.NewManager(jwt.DefaultConfig("middleware-test-secret"))
@@ -160,7 +160,7 @@ func (v *jwtTokenValidator) ValidateToken(tokenStr string) (map[string]interface
 
 func TestOAuthFileCredentialReaderIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	tmpDir := t.TempDir()
@@ -193,7 +193,7 @@ func TestOAuthFileCredentialReaderIntegration(t *testing.T) {
 
 func TestTokenStoreWithTTLIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -221,7 +221,7 @@ func TestTokenStoreWithTTLIntegration(t *testing.T) {
 
 func TestMiddlewareChainIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	keyValidator := &testAPIKeyValidator{
@@ -269,7 +269,7 @@ func (v *testAPIKeyValidator) ValidateKey(key string) ([]string, error) {
 
 func TestAutoRefresherIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+		t.Skip("skipping integration test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

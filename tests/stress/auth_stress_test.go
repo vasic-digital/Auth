@@ -17,7 +17,7 @@ import (
 
 func TestStress_ConcurrentJWTCreateValidate(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("stress-test-jwt-secret"))
@@ -60,7 +60,7 @@ func TestStress_ConcurrentJWTCreateValidate(t *testing.T) {
 
 func TestStress_ConcurrentAPIKeyStoreOperations(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := apikey.NewInMemoryStore()
@@ -105,7 +105,7 @@ func TestStress_ConcurrentAPIKeyStoreOperations(t *testing.T) {
 
 func TestStress_ConcurrentTokenStoreReadWrite(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -140,7 +140,7 @@ func TestStress_ConcurrentTokenStoreReadWrite(t *testing.T) {
 
 func TestStress_ConcurrentJWTRefresh(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(jwt.DefaultConfig("refresh-stress-secret"))
@@ -189,7 +189,7 @@ func TestStress_ConcurrentJWTRefresh(t *testing.T) {
 
 func TestStress_ConcurrentTokenStoreCleanup(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -223,7 +223,7 @@ func TestStress_ConcurrentTokenStoreCleanup(t *testing.T) {
 
 func TestStress_APIKeyGenerationUniqueness(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping stress test in short mode")
+		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	gen := apikey.NewGenerator(&apikey.GeneratorConfig{

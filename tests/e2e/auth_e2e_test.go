@@ -19,7 +19,7 @@ import (
 
 func TestE2E_FullAuthenticationPipeline(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	jwtMgr := jwt.NewManager(&jwt.Config{
@@ -87,7 +87,7 @@ func (v *jwtValidator) ValidateToken(tokenStr string) (map[string]interface{}, e
 
 func TestE2E_APIKeyProtectedEndpoint(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	gen := apikey.NewGenerator(apikey.DefaultGeneratorConfig())
@@ -141,7 +141,7 @@ func (v *apiKeyValidator) ValidateKey(keyStr string) ([]string, error) {
 
 func TestE2E_TokenRefreshCycle(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	mgr := jwt.NewManager(&jwt.Config{
@@ -179,7 +179,7 @@ func TestE2E_TokenRefreshCycle(t *testing.T) {
 
 func TestE2E_OAuthCredentialLifecycle(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	creds := &oauth.Credentials{
@@ -207,7 +207,7 @@ func TestE2E_OAuthCredentialLifecycle(t *testing.T) {
 
 func TestE2E_TokenStoreCompleteLifecycle(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	store := token.NewInMemoryStore()
@@ -245,7 +245,7 @@ func TestE2E_TokenStoreCompleteLifecycle(t *testing.T) {
 
 func TestE2E_MaskedKeyDisplay(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")
+		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
 	}
 
 	gen := apikey.NewGenerator(&apikey.GeneratorConfig{
