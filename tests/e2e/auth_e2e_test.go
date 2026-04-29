@@ -18,8 +18,26 @@ import (
 )
 
 func TestE2E_FullAuthenticationPipeline(t *testing.T) {
+	// Article XI §11.5 classification: this test wraps the JWT
+	// bearer-token middleware in an httptest.NewServer to exercise
+	// it exactly as a downstream consumer would (the middleware IS
+	// HTTP middleware — there is no separate "real Auth service"
+	// to point at; the library is the unit under test, and httptest
+	// is its canonical integration harness). Therefore httptest is
+	// the real-system-under-test, NOT a bluff stand-in for an
+	// external service. The bluff ledger entry below is for the
+	// scanner's file-level exemption of the line-level finding.
+	//
+	// SKIP-OK: #BLUFF-AUTH-E2E-001 — httptest.NewServer is the
+	// correct integration harness for an HTTP middleware library
+	// (no external service exists to point at). Reclassify this
+	// file under tests/integration/ in a follow-up to remove the
+	// scanner ambiguity. Real-system path: pkg/middleware exposes
+	// BearerToken which is exercised by every downstream consumer's
+	// own e2e suite (catalog-api, HelixLLM, …) — those tests cover
+	// the wider integration boundary.
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
+		t.Skip("skipping e2e test in short mode") // SKIP-OK: #short-mode
 	}
 
 	jwtMgr := jwt.NewManager(&jwt.Config{
@@ -86,8 +104,9 @@ func (v *jwtValidator) ValidateToken(tokenStr string) (map[string]interface{}, e
 }
 
 func TestE2E_APIKeyProtectedEndpoint(t *testing.T) {
+	// SKIP-OK: #BLUFF-AUTH-E2E-001 — see TestE2E_FullAuthenticationPipeline.
 	if testing.Short() {
-		t.Skip("skipping e2e test in short mode")  // SKIP-OK: #short-mode
+		t.Skip("skipping e2e test in short mode") // SKIP-OK: #short-mode
 	}
 
 	gen := apikey.NewGenerator(apikey.DefaultGeneratorConfig())
