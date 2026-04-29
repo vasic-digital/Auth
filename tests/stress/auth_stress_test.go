@@ -104,6 +104,7 @@ func TestStress_ConcurrentAPIKeyStoreOperations(t *testing.T) {
 }
 
 func TestStress_ConcurrentTokenStoreReadWrite(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	if testing.Short() {
 		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
@@ -188,6 +189,7 @@ func TestStress_ConcurrentJWTRefresh(t *testing.T) {
 }
 
 func TestStress_ConcurrentTokenStoreCleanup(t *testing.T) {
+	// bluff-scan: no-assert-ok (concurrency test — go test -race catches data races; absence of panic == correctness)
 	if testing.Short() {
 		t.Skip("skipping stress test in short mode")  // SKIP-OK: #short-mode
 	}
